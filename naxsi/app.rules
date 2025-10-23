@@ -1,0 +1,46 @@
+###################################
+## Application-Specific Rules     ##
+###################################
+
+## NAXSI Check Rules - Define blocking thresholds
+## These rules define when NAXSI should block a request based on accumulated scores
+
+# Block when SQL score reaches 8 or higher
+CheckRule "$SQL >= 8" BLOCK;
+
+# Block when RFI (Remote File Inclusion) score reaches 8 or higher
+CheckRule "$RFI >= 8" BLOCK;
+
+# Block when TRAVERSAL score reaches 4 or higher
+CheckRule "$TRAVERSAL >= 4" BLOCK;
+
+# Block when XSS score reaches 8 or higher
+CheckRule "$XSS >= 8" BLOCK;
+
+# Block when EVADE score reaches 4 or higher
+CheckRule "$EVADE >= 4" BLOCK;
+
+# Block when file UPLOAD score reaches 8 or higher
+CheckRule "$UPLOAD >= 8" BLOCK;
+
+# LibInjection - Block on any detection (high confidence)
+CheckRule "$LIBINJECTION_SQL >= 1" BLOCK;
+CheckRule "$LIBINJECTION_XSS >= 1" BLOCK;
+
+###################################
+## Whitelist Rules (Examples)     ##
+###################################
+## Use these to allow legitimate patterns that might otherwise be blocked
+## Format: BasicRule wl:RULE_ID "mz:ZONE"
+
+## Example: Allow single quotes in a specific parameter
+# BasicRule wl:1013 "mz:ARGS:username";
+
+## Example: Allow HTML in a rich text editor field
+# BasicRule wl:1302,1303 "mz:ARGS:content";
+
+## Example: Allow URLs in a specific field
+# BasicRule wl:1100 "mz:ARGS:website";
+
+## Example: Whitelist for healthcheck endpoint (if needed)
+# BasicRule wl:0 "mz:$URL:/healthz|URL";

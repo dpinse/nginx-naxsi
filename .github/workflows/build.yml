@@ -65,7 +65,7 @@ jobs:
             include /etc/nginx/naxsi/app.rules;
 
             server {
-              listen 8080 default_server;
+              listen 80 default_server;
 
               location / {
                 SecRulesEnabled;
@@ -84,8 +84,16 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/wargio/naxsi/${{ env.NAXSI_VERSION }}/naxsi_rules/naxsi_core.rules \
             -o test/fixtures/naxsi/naxsi_core.rules
 
-          # Minimal per-app overrides (empty is fine)
-          printf "# app-specific allowlists/exceptions\n" > test/fixtures/naxsi/app.rules
+          # Minimal per-app overrides with CheckRules
+          cat > test/fixtures/naxsi/app.rules <<'APPRULES'
+          # CheckRules required for blocking
+          CheckRule "$SQL >= 8" BLOCK;
+          CheckRule "$RFI >= 8" BLOCK;
+          CheckRule "$TRAVERSAL >= 4" BLOCK;
+          CheckRule "$XSS >= 8" BLOCK;
+          CheckRule "$EVADE >= 4" BLOCK;
+          CheckRule "$UPLOAD >= 8" BLOCK;
+          APPRULES
 
       - name: Run container with mounted fixtures
         run: |
