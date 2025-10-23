@@ -58,7 +58,8 @@ FROM alpine:3.20
 RUN addgroup -S nginx && adduser -S -G nginx nginx \
  && apk add --no-cache pcre2 zlib openssl ca-certificates \
  && mkdir -p /var/log/nginx /var/cache/nginx /etc/nginx/modules \
- && chown -R nginx:nginx /var/log/nginx /var/cache/nginx
+ && ln -sf /dev/stdout /var/log/nginx/access.log \
+ && ln -sf /dev/stderr /var/log/nginx/error.log
 
 # Bring in nginx and default tree (no custom config/rules baked in)
 COPY --from=build /usr/sbin/nginx /usr/sbin/nginx
@@ -76,7 +77,6 @@ LABEL org.opencontainers.image.title="nginx + naxsi (dynamic module)" \
 
 EXPOSE 80 443
 STOPSIGNAL SIGQUIT
-USER nginx
 
 # No config baked in; your mounted nginx.conf must 'load_module modules/ngx_http_naxsi_module.so;'
 CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
