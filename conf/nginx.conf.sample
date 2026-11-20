@@ -1,4 +1,3 @@
-# /etc/nginx/nginx.conf  (mounted)
 load_module modules/ngx_http_naxsi_module.so;
 
 user  nginx;
@@ -11,17 +10,25 @@ http {
   default_type  application/octet-stream;
   sendfile      on;
 
-  # Mounted rules:
+  upstream upstream_app {
+    server 127.0.0.1:8080;
+  }
+
+  # Core definitions & blocking MainRule sets (http context)
   include /etc/nginx/naxsi/naxsi_core.rules;
-  include /etc/nginx/naxsi/app.rules;
+  include /etc/nginx/naxsi/blocking/*.rules;
 
   server {
     listen 80 default_server;
 
     location / {
       SecRulesEnabled;
-      LearningMode;         # start in detect-only; remove to enforce
+      LearningMode;         # remove once tuned to enforce blocking
       DeniedUrl "/RequestDenied";
+
+      # CheckRule thresholds & whitelists (location context)
+      include /etc/nginx/naxsi/app.rules;
+
       proxy_pass http://upstream_app;
     }
 
