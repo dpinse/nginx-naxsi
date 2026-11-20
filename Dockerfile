@@ -5,7 +5,7 @@
 ########################
 FROM alpine:3.20 AS build
 
-ARG NGINX_VERSION=1.29.2
+ARG NGINX_VERSION=1.31.9
 ARG NAXSI_VERSION=1.7
 
 # Build deps
