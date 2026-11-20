@@ -8,8 +8,6 @@ on:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
-  NGINX_VERSION: "1.29.2"   # bump here in PRs
-  NAXSI_VERSION: "1.7"      # bump here in PRs
   TEST_PORT: "8080"
 
 permissions:
@@ -19,13 +17,25 @@ permissions:
   security-events: write
 
 jobs:
+
   # Build once for amd64 and RUN IT with mounted fixtures (dynamic mounts)
   smoke:
     name: Smoke test (mounted config/rules)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Load versions
+        run: |
+          set -euo pipefail
+          set -a
+          . ./versions.env
+          set +a
+          {
+            echo "NGINX_VERSION=${NGINX_VERSION}"
+            echo "NAXSI_VERSION=${NAXSI_VERSION}"
+          } >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -124,7 +134,18 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Load versions
+        run: |
+          set -euo pipefail
+          set -a
+          . ./versions.env
+          set +a
+          {
+            echo "NGINX_VERSION=${NGINX_VERSION}"
+            echo "NAXSI_VERSION=${NAXSI_VERSION}"
+          } >> "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

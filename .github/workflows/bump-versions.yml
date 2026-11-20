@@ -1,0 +1,110 @@
+name: Bump NGINX and NAXSI versions
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Weekly on Mondays at 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      nginx_version:
+        description: "Optional override for NGINX version"
+        required: false
+        type: string
+      naxsi_version:
+        description: "Optional override for NAXSI version"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve latest NGINX (mainline) and NAXSI versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_NGINX: ${{ inputs.nginx_version }}
+          INPUT_NAXSI: ${{ inputs.naxsi_version }}
+        run: |
+          set -euo pipefail
+
+          # Load current versions from versions.env
+          set -a
+          . ./versions.env
+          set +a
+
+          CURRENT_NGINX="${NGINX_VERSION}"
+          CURRENT_NAXSI="${NAXSI_VERSION}"
+
+          if [ -n "$INPUT_NGINX" ]; then
+            LATEST_NGINX="$INPUT_NGINX"
+          else
+            LATEST_NGINX=$(curl -fsSL https://nginx.org/en/download.html \
+              | grep -oE 'nginx-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz' \
+              | awk 'NR==1 { print; exit }' \
+              | sed -E 's/^nginx-//; s/\.tar\.gz$//')
+
+            curl -fsSI "https://nginx.org/download/nginx-${LATEST_NGINX}.tar.gz" >/dev/null
+          fi
+
+          if [ -n "$INPUT_NAXSI" ]; then
+            LATEST_NAXSI="$INPUT_NAXSI"
+          else
+            LATEST_NAXSI=$(gh release view --repo wargio/naxsi --json tagName -q '.tagName' | sed -E 's/^v//')
+          fi
+
+          if [ -z "$LATEST_NGINX" ] || [ -z "$LATEST_NAXSI" ]; then
+            echo "Failed to resolve versions (NGINX='$LATEST_NGINX', NAXSI='$LATEST_NAXSI')" >&2
+            exit 1
+          fi
+
+          echo "current_nginx=$CURRENT_NGINX" >> "$GITHUB_OUTPUT"
+          echo "current_naxsi=$CURRENT_NAXSI" >> "$GITHUB_OUTPUT"
+          echo "latest_nginx=$LATEST_NGINX" >> "$GITHUB_OUTPUT"
+          echo "latest_naxsi=$LATEST_NAXSI" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_NGINX" = "$LATEST_NGINX" ] && [ "$CURRENT_NAXSI" = "$LATEST_NAXSI" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update versions.env and Dockerfile
+        if: steps.versions.outputs.changed == 'true'
+        env:
+          LATEST_NGINX: ${{ steps.versions.outputs.latest_nginx }}
+          LATEST_NAXSI: ${{ steps.versions.outputs.latest_naxsi }}
+        run: |
+          set -euo pipefail
+
+          cat > versions.env <<EOF
+          NGINX_VERSION=${LATEST_NGINX}
+          NAXSI_VERSION=${LATEST_NAXSI}
+          EOF
+
+          if [ -f Dockerfile ]; then
+            sed -i -E "s|^(ARG[[:space:]]+NGINX_VERSION=).*|\1${LATEST_NGINX}|" Dockerfile
+            sed -i -E "s|^(ARG[[:space:]]+NAXSI_VERSION=).*|\1${LATEST_NAXSI}|" Dockerfile
+          fi
+
+      - name: Create Pull Request
+        if: steps.versions.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: "chore(deps): bump nginx to ${{ steps.versions.outputs.latest_nginx }} and naxsi to ${{ steps.versions.outputs.latest_naxsi }}"
+          title: "chore(deps): bump nginx (${{ steps.versions.outputs.latest_nginx }}) & naxsi (${{ steps.versions.outputs.latest_naxsi }})"
+          body: |
+            Automated upstream version check detected new releases:
+
+            | Component | Previous | Target |
+            | --- | --- | --- |
+            | NGINX (mainline) | `${{ steps.versions.outputs.current_nginx }}` | `${{ steps.versions.outputs.latest_nginx }}` |
+            | NAXSI (`wargio/naxsi`) | `${{ steps.versions.outputs.current_naxsi }}` | `${{ steps.versions.outputs.latest_naxsi }}` |
+          branch: chore/bump-nginx-naxsi
+          delete-branch: true
